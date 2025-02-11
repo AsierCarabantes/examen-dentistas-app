@@ -2,23 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Models\Usuario;
 use Illuminate\Http\Request;
-use App\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 
-class UserController extends Controller {
+class AuthController extends Controller {
     
     public function register(Request $request) {
         $validateUser = Validator::make($request->all(), [
             'nombre' => 'required',
             'apellido' => 'required',
-            'DNI' => 'required|unique:users,DNI',
+            'dni' => 'required|unique:usuarios,dni',
             'password' => 'required',
-            'fecha_nacimiento' => 'required',
-            'id_rol' => 'required'
+            'rol' => 'required|in:admin,participante',
+            'sorteo_id' => 'nullable'
         ]);
 
         if($validateUser->fails()) {
@@ -29,29 +28,29 @@ class UserController extends Controller {
             ], 401);
         }
 
-        $user = new User();
-        $user->nombre = $request->input('nombre');
-        $user->apellido = $request->input('apellido');
-        $user->DNI = $request->input('DNI');
-        $user->password = Hash::make($request->input('password'));
-        $user->fecha_nacimiento = $request->input('fecha_nacimiento');
-        $user->id_rol = $request->input('id_rol');
+        $user = new Usuario();
+        $user->nombre = $request->nombre;
+        $user->apellido = $request->apellido;
+        $user->dni = $request->dni;
+        $user->password = Hash::make($request->password);
+        $user->rol = $request->rol;
+        $user->sorteo_id = $request->sorteo_id;
+
         $user->save();
 
         return response()->json([
             'status' => true,
-            'message' => 'User created successfully',
+            'message' => 'User created successfully'
         ], 201);
-
     }
 
     public function login(Request $request) {
         $validateUser = Validator::make($request->all(), [
-            'DNI' => 'required',
-            'password' => 'required',
+            'dni' => 'required',
+            'password' => 'required'
         ]);
 
-        if($validateUser->fails()) {
+        if ($validateUser->fails()) {
             return response()->json([
                 'status' => false,
                 'message' => 'validation error',
@@ -59,43 +58,32 @@ class UserController extends Controller {
             ], 401);
         }
 
-        $user = User::where('DNI', $request->DNI)->first();
+        $user = Usuario::where('dni', $request->dni)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'status' => false,
-                'message' => 'Credenciales incorrectas',
+                'message' => 'Credenciales incorrectas'
             ], 401);
         }
 
         $token = $user->createToken('API Token')->plainTextToken;
 
         return response()->json([
+            'status' => true,
             'message' => 'Login exitoso',
             'token' => $token,
-            'DNI' => $user->DNI,
+            'dni' => $user->DNI,
             'password' => $user->password
         ], 200);
     }
 
     public function logout(Request $request) {
-        
         $request->user()->tokens()->delete();
-    
+
         return response()->json([
             'status' => true,
             'message' => 'Sesión cerrada correctamente'
         ], 200);
     }
-
-    public function dentistas() {
-        $user = auth('sanctum')->user(); 
-        if (!$user || $user->id_rol !== 1) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
-
-        $dentistas = User::where('id_rol', '2')->get();
-        return response()->json($dentistas);
-    }
-
 }
